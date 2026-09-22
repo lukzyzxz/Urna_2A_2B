@@ -9,7 +9,7 @@ Baixe o repositório e abra **index.html** no navegador. Não precisa instalar d
 ## Votação
 
 - **67**: primeiro candidato (Fulano por padrão).
-- **33**: segundo candidato (Bertrano por padrão).
+- **33**: segundo candidato (Bertrano por padrão). O mesário pode alterar ambos os números antes do primeiro voto.
 - Digite os **dois números**, confira o nome e pressione **CONFIRMA** ou Enter.
 - **BRANCO**, ou a tecla **B**, seleciona voto em branco. Confirme para registrá-lo.
 - **CORRIGE**, Backspace, Delete ou Escape limpa todo o preenchimento.
@@ -26,14 +26,14 @@ O zero inicial inicia uma entrada separada, exibida como pontos. Essa sequência
 
 No painel é possível:
 
-- Alterar os nomes dos candidatos **67 e 33** antes do primeiro voto.
+- Alterar o nome e o número de cada candidato antes do primeiro voto. Os números devem ter dois dígitos, entre **10 e 99**, e ser diferentes. Depois de iniciado o pleito, ficam bloqueados para preservar a associação dos votos.
 - Conferir votos, brancos, total, percentuais, vencedor e empate.
 - Encerrar a votação, bloqueando novos votos.
 - Iniciar uma nova eleição, com confirmação antes de zerar os votos.
 
 Os brancos entram no total e nos percentuais, mas não determinam o vencedor. Empates não apagam a contagem automaticamente. Os nomes são preservados ao iniciar uma nova eleição.
 
-O código está em `ADMIN_CODE` e os números em `CANDIDATE_NUMBERS`, no arquivo `app.js`. Os votos e nomes da versão anterior são preservados: o antigo candidato 1 corresponde ao **67**, e o antigo candidato 2 ao **33**.
+O código está em `ADMIN_CODE`, no arquivo `app.js`. Os números dos candidatos são salvos junto com os votos neste navegador. Os dados anteriores são preservados: o antigo candidato 1 começa com **67**, e o antigo candidato 2 com **33**. Ao iniciar uma nova eleição, os nomes e números configurados continuam disponíveis.
 
 ## Sons
 

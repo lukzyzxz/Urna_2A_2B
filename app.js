@@ -2,10 +2,9 @@
 
 // Altere aqui o código do mesário. É uma proteção de interface, não autenticação de servidor.
 const ADMIN_CODE = '012345678901';
-const CANDIDATE_NUMBERS = ['67', '33'];
 const STORAGE_KEY = 'urna-2a-2b-v1';
 const $ = (id) => document.getElementById(id);
-const initialState = () => ({ names: ['Fulano', 'Bertrano'], votes: [0, 0], blank: 0, closed: false });
+const initialState = () => ({ names: ['Fulano', 'Bertrano'], numbers: ['67', '33'], votes: [0, 0], blank: 0, closed: false });
 let state = initialState();
 let storageBlocked = false;
 try {
@@ -13,7 +12,9 @@ try {
   if (saved) {
     const parsed = JSON.parse(saved);
     if (!Array.isArray(parsed.names) || parsed.names.length !== 2 || !parsed.names.every(n => typeof n === 'string' && n.trim().length > 0 && n.length <= 35) || !Array.isArray(parsed.votes) || parsed.votes.length !== 2 || !parsed.votes.every(n => Number.isSafeInteger(n) && n >= 0) || !Number.isSafeInteger(parsed.blank) || parsed.blank < 0 || typeof parsed.closed !== 'boolean') throw new Error('Dados inválidos');
-    state = parsed;
+    const numbers = parsed.numbers === undefined ? ['67', '33'] : parsed.numbers;
+    if (!Array.isArray(numbers) || numbers.length !== 2 || !numbers.every(n => typeof n === 'string' && /^[1-9][0-9]$/.test(n)) || numbers[0] === numbers[1]) throw new Error('Números inválidos');
+    state = { ...parsed, numbers };
   }
 } catch {
   storageBlocked = true;
@@ -102,10 +103,10 @@ function render() {
     return;
   }
   if (selection === '') {
-    $('screen').innerHTML = `<div class="welcome-screen"><div class="screen-seal">${$('seal-template').innerHTML}</div><h1>JUSTIÇA ELEITORAL</h1><p>Digite o número do seu candidato</p><div class="candidate-guide"><span><b>67</b> ${escapeHTML(state.names[0])}</span><span><b>33</b> ${escapeHTML(state.names[1])}</span></div></div>`;
+    $('screen').innerHTML = `<div class="welcome-screen"><div class="screen-seal">${$('seal-template').innerHTML}</div><h1>JUSTIÇA ELEITORAL</h1><p>Digite o número do seu candidato</p><div class="candidate-guide"><span><b>${state.numbers[0]}</b> ${escapeHTML(state.names[0])}</span><span><b>${state.numbers[1]}</b> ${escapeHTML(state.names[1])}</span></div></div>`;
     return;
   }
-  const index = CANDIDATE_NUMBERS.indexOf(selection);
+  const index = state.numbers.indexOf(selection);
   const candidate = index !== -1;
   const blank = selection === 'blank';
   const invalid = !candidate && !blank && selection.length === 2;
@@ -155,10 +156,10 @@ function voteBlank() {
   render();
 }
 function confirmVote() {
-  if (!canVote() || ![...CANDIDATE_NUMBERS, 'blank'].includes(selection)) return;
+  if (!canVote() || ![...state.numbers, 'blank'].includes(selection)) return;
   const next = { ...state, votes: [...state.votes] };
   if (selection === 'blank') next.blank++;
-  else next.votes[CANDIDATE_NUMBERS.indexOf(selection)]++;
+  else next.votes[state.numbers.indexOf(selection)]++;
   if (!persist(next)) return;
   busy = true;
   selection = '';
@@ -203,7 +204,7 @@ function renderResults() {
   const total = state.votes[0] + state.votes[1] + state.blank;
   const winner = state.votes[0] === state.votes[1] ? null : state.votes[0] > state.votes[1] ? 0 : 1;
   $('result-title').textContent = total === 0 ? 'Nenhum voto registrado.' : winner === null ? 'Empate! Será necessária uma nova eleição.' : `${state.names[winner]} ${state.closed ? 'venceu' : 'está na frente'} com ${state.votes[winner]} voto(s).`;
-  $('results').innerHTML = [...state.names.map((name, i) => `${CANDIDATE_NUMBERS[i]} · ${name}`), 'Em branco'].map((name, index) => {
+  $('results').innerHTML = [...state.names.map((name, i) => `${state.numbers[i]} · ${name}`), 'Em branco'].map((name, index) => {
     const count = index === 2 ? state.blank : state.votes[index];
     const percent = total ? (count / total * 100).toFixed(1) : '0.0';
     return `<div class="result-row"><div class="result-line"><span>${escapeHTML(name)}</span><strong>${count} · ${percent}%</strong></div><div class="bar"><span style="width:${percent}%"></span></div></div>`;
@@ -211,7 +212,9 @@ function renderResults() {
   $('total').textContent = `${total} voto(s) no total · ${state.votes[0] + state.votes[1]} em candidatos · ${state.closed ? 'Encerrada' : 'Em andamento'}`;
   $('name1').value = state.names[0];
   $('name2').value = state.names[1];
-  $('name1').disabled = $('name2').disabled = total > 0 || state.closed || storageBlocked;
+  $('number1').value = state.numbers[0];
+  $('number2').value = state.numbers[1];
+  $('name1').disabled = $('name2').disabled = $('number1').disabled = $('number2').disabled = total > 0 || state.closed || storageBlocked;
   $('settings').querySelector('button').disabled = total > 0 || state.closed || storageBlocked;
   $('end-election').disabled = state.closed || storageBlocked;
   $('end-election').textContent = state.closed ? 'Votação encerrada' : 'Encerrar votação';
@@ -223,9 +226,14 @@ $('settings').addEventListener('submit', event => {
   event.preventDefault();
   if (state.votes[0] + state.votes[1] + state.blank > 0 || state.closed) return;
   const names = [$('name1').value.trim(), $('name2').value.trim()];
+  const numbers = [$('number1').value.trim(), $('number2').value.trim()];
   if (names.some(name => !name || name.length > 35)) { $('admin-message').textContent = 'Preencha os dois nomes (até 35 caracteres).'; return; }
-  if (persist({ ...state, names })) {
-    $('admin-message').textContent = 'Nomes atualizados. A urna está pronta.';
+  if (numbers.some(number => !/^[1-9][0-9]$/.test(number)) || numbers[0] === numbers[1]) {
+    $('admin-message').textContent = 'Use dois números diferentes, de 10 a 99. O zero inicial é reservado ao mesário.';
+    return;
+  }
+  if (persist({ ...state, names, numbers })) {
+    $('admin-message').textContent = 'Nomes e números atualizados. A urna está pronta.';
     render();
     renderResults();
   }
@@ -242,7 +250,7 @@ $('end-election').addEventListener('click', () => {
 $('reset').addEventListener('click', () => $('reset-dialog').showModal());
 $('cancel-reset').addEventListener('click', () => $('reset-dialog').close());
 $('confirm-reset').addEventListener('click', () => {
-  if (!persist({ ...initialState(), names: [...state.names] })) return;
+  if (!persist({ ...initialState(), names: [...state.names], numbers: [...state.numbers] })) return;
   clearTimeout(finishTimer);
   busy = false;
   selection = '';
