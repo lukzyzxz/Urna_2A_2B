@@ -1,7 +1,8 @@
 'use strict';
 
 // Altere aqui o código do mesário. É uma proteção de interface, não autenticação de servidor.
-const ADMIN_CODE = '12345678901';
+const ADMIN_CODE = '012345678901';
+const CANDIDATE_NUMBERS = ['67', '33'];
 const STORAGE_KEY = 'urna-2a-2b-v1';
 const $ = (id) => document.getElementById(id);
 const initialState = () => ({ names: ['Fulano', 'Bertrano'], votes: [0, 0], blank: 0, closed: false });
@@ -46,7 +47,8 @@ function persist(next) {
   }
 }
 
-// Sons sintetizados localmente: nenhuma gravação ou biblioteca é necessária.
+// Bipes mais presentes e sequência rápida de confirmação inspirada na urna.
+// O ganho é limitado para evitar distorção; o volume final depende do dispositivo.
 function playSound(kind = 'key') {
   if (!soundOn) return;
   try {
@@ -54,24 +56,30 @@ function playSound(kind = 'key') {
     if (!Audio) return;
     audioContext ||= new Audio();
     if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
-    const now = audioContext.currentTime;
+    const now = audioContext.currentTime + .01;
     const notes = kind === 'confirm'
-      ? [[880, 0, .09], [880, .13, .09], [880, .26, .09], [1320, .4, .35]]
-      : kind === 'correct' ? [[420, 0, .12]] : [[1046, 0, .055]];
+      ? [[1100,0,.065],[1100,.09,.065],[1100,.18,.065],[1100,.27,.065],[1100,.36,.065],[1450,.46,.43]]
+      : kind === 'correct' ? [[700,0,.1],[500,.12,.1]] : [[960,0,.11]];
     for (const [frequency, delay, duration] of notes) {
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
+      const filter = audioContext.createBiquadFilter();
       oscillator.type = 'square';
       oscillator.frequency.value = frequency;
+      filter.type = 'lowpass';
+      filter.frequency.value = 3500;
       gain.gain.setValueAtTime(0, now + delay);
-      gain.gain.linearRampToValueAtTime(.035, now + delay + .005);
+      gain.gain.linearRampToValueAtTime(.18, now + delay + .006);
+      gain.gain.setValueAtTime(.18, now + delay + duration - .015);
       gain.gain.exponentialRampToValueAtTime(.001, now + delay + duration);
-      oscillator.connect(gain);
+      oscillator.connect(filter);
+      filter.connect(gain);
       gain.connect(audioContext.destination);
+      oscillator.onended = () => { oscillator.disconnect(); filter.disconnect(); gain.disconnect(); };
       oscillator.start(now + delay);
       oscillator.stop(now + delay + duration + .01);
     }
-  } catch { /* O áudio é opcional: uma falha não impede a votação. */ }
+  } catch { /* Falha no áudio não impede a votação. */ }
 }
 
 function escapeHTML(value) {
@@ -79,33 +87,63 @@ function escapeHTML(value) {
 }
 
 function render() {
-  $('guide1').textContent = state.names[0];
-  $('guide2').textContent = state.names[1];
-  const disabled = busy || state.closed || storageBlocked;
-  document.querySelectorAll('.number-key, .action-keys button').forEach(button => { button.disabled = disabled; });
+  const adminEntry = selection.startsWith('0');
+  document.querySelectorAll('.number-key').forEach(button => { button.disabled = busy; });
+  $('correct').disabled = busy;
+  $('blank').disabled = !canVote();
+  $('confirm').disabled = true;
   $('status').textContent = storageBlocked ? 'ARMAZENAMENTO INDISPONÍVEL' : state.closed ? 'VOTAÇÃO ENCERRADA' : busy ? 'VOTO REGISTRADO' : 'URNA PRONTA';
-  if (storageBlocked || state.closed || busy) {
-    $('screen').innerHTML = `<div class="screen-top"><span>ELEIÇÃO ESCOLAR</span><span>2A & 2B</span></div><div class="end-screen">${busy ? '<strong>FIM</strong><p>Seu voto foi registrado.</p>' : `<strong class="closed">${storageBlocked ? 'Urna indisponível' : 'Votação encerrada'}</strong><p>Procure o mesário.</p>`}</div>`;
+  if (adminEntry) {
+    $('screen').innerHTML = `<div class="access-screen"><h2>Acesso do mesário</h2><p>Digite o código de acesso completo.</p><div class="code-dots" aria-label="${selection.length} dígitos inseridos">${'●'.repeat(selection.length)}${'○'.repeat(ADMIN_CODE.length-selection.length)}</div><p>CORRIGE para cancelar</p></div>`;
     return;
   }
-  const candidate = selection === '1' || selection === '2';
+  if (storageBlocked || state.closed || busy) {
+    $('screen').innerHTML = `<div class="end-screen">${busy ? '<strong>FIM</strong><p>VOTO REGISTRADO</p>' : `<strong class="closed">${storageBlocked ? 'Urna indisponível' : 'Votação encerrada'}</strong><p>Procure o mesário.</p>`}</div>`;
+    return;
+  }
+  if (selection === '') {
+    $('screen').innerHTML = `<div class="welcome-screen"><div class="screen-seal">${$('seal-template').innerHTML}</div><h1>JUSTIÇA ELEITORAL</h1><p>Digite o número do seu candidato</p><div class="candidate-guide"><span><b>67</b> ${escapeHTML(state.names[0])}</span><span><b>33</b> ${escapeHTML(state.names[1])}</span></div></div>`;
+    return;
+  }
+  const index = CANDIDATE_NUMBERS.indexOf(selection);
+  const candidate = index !== -1;
   const blank = selection === 'blank';
-  const invalid = selection !== '' && !candidate && !blank;
-  const name = candidate ? state.names[Number(selection) - 1] : blank ? 'VOTO EM BRANCO' : invalid ? 'NÚMERO INVÁLIDO' : 'Aguardando seu voto';
-  $('screen').innerHTML = `<div class="screen-top"><span>SEU VOTO PARA</span><span>2A & 2B</span></div><h2>Representante de turma</h2><div class="vote-content"><div>${blank ? '<span class="vote-label">Nenhum candidato selecionado</span>' : `<span class="vote-label">Número:</span><span class="digit ${selection === '' ? 'empty' : ''}">${escapeHTML(selection)}</span>`}<p class="candidate-name">${escapeHTML(name)}</p><span class="candidate-party">${candidate ? 'CANDIDATO À REPRESENTAÇÃO' : invalid ? 'USE CORRIGE PARA TENTAR NOVAMENTE' : blank ? 'CONFIRME PARA REGISTRAR' : 'DIGITE 1 OU 2 NO TECLADO'}</span></div>${candidate ? '<div class="portrait" aria-hidden="true"><svg viewBox="0 0 80 90"><circle cx="40" cy="28" r="18"/><path d="M8 85v-9c0-23 15-30 32-30s32 7 32 30v9z"/></svg></div>' : ''}</div><div class="screen-instructions"><b>CONFIRMA</b> para confirmar seu voto<br><b>CORRIGE</b> para reiniciar o preenchimento</div>`;
+  const invalid = !candidate && !blank && selection.length === 2;
+  const name = candidate ? state.names[index] : blank ? 'VOTO EM BRANCO' : invalid ? 'NÚMERO INVÁLIDO' : 'Digite o segundo número';
+  const digits = [0,1].map(i => `<span class="digit ${selection.length === i ? 'empty' : ''}">${escapeHTML(selection[i] || '')}</span>`).join('');
+  $('screen').innerHTML = `<div class="screen-top">SEU VOTO PARA</div><h2>Representante de turma</h2><div class="vote-content"><div class="candidate-data">${blank ? '' : `<div class="number-line"><span>Número:</span><div class="digits">${digits}</div></div>`}<p class="candidate-name">${escapeHTML(name)}</p><span class="candidate-party">${candidate ? 'ELEIÇÃO ESCOLAR · 2A & 2B' : invalid ? 'USE CORRIGE PARA TENTAR NOVAMENTE' : blank ? 'NENHUM CANDIDATO SELECIONADO' : 'AGUARDANDO PREENCHIMENTO'}</span></div>${candidate ? '<div class="portrait" aria-hidden="true"><svg viewBox="0 0 80 90"><circle cx="40" cy="28" r="18"/><path d="M8 85v-9c0-23 15-30 32-30s32 7 32 30v9z"/></svg></div>' : ''}</div><div class="screen-instructions">Aperte a tecla:<br><b>CONFIRMA</b> para CONFIRMAR este voto<br><b>CORRIGE</b> para REINICIAR este voto</div>`;
   $('confirm').disabled = !(candidate || blank);
 }
 
 function canVote() { return !busy && !state.closed && !storageBlocked; }
+function openAdmin() {
+  selection = '';
+  render();
+  $('admin-message').textContent = '';
+  $('admin-panel').hidden = false;
+  renderResults();
+  $('admin-dialog').showModal();
+}
 function pressNumber(number) {
-  if (!canVote()) return;
+  if (busy || !/^[0-9]$/.test(number)) return;
   playSound();
-  if (selection !== '') return;
-  selection = number === '3' ? 'blank' : number;
+  // Um zero inicia o código especial. Nunca é contado como voto.
+  if (selection.startsWith('0') || (selection === '' && number === '0')) {
+    selection += number;
+    if (selection.length === ADMIN_CODE.length) {
+      if (selection === ADMIN_CODE) { openAdmin(); return; }
+      selection = '';
+      notify('Código de mesário incorreto. Tente novamente.');
+    }
+    render();
+    return;
+  }
+  if (!canVote() || selection === 'blank' || selection.length >= 2) return;
+  selection += number;
   render();
 }
 function correct() {
-  if (!canVote()) return;
+  if (busy) return;
   playSound('correct');
   selection = '';
   render();
@@ -117,10 +155,10 @@ function voteBlank() {
   render();
 }
 function confirmVote() {
-  if (!canVote() || !['1', '2', 'blank'].includes(selection)) return;
+  if (!canVote() || ![...CANDIDATE_NUMBERS, 'blank'].includes(selection)) return;
   const next = { ...state, votes: [...state.votes] };
   if (selection === 'blank') next.blank++;
-  else next.votes[Number(selection) - 1]++;
+  else next.votes[CANDIDATE_NUMBERS.indexOf(selection)]++;
   if (!persist(next)) return;
   busy = true;
   selection = '';
@@ -148,7 +186,7 @@ $('sound').addEventListener('click', () => {
 document.addEventListener('keydown', event => {
   if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || $('admin-dialog').open || $('reset-dialog').open || /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
   if (/^[0-9]$/.test(event.key)) { event.preventDefault(); pressNumber(event.key); }
-  else if (event.key === 'Enter' && event.target.tagName !== 'BUTTON' && event.target.tagName !== 'A') { event.preventDefault(); confirmVote(); }
+  else if (event.key === 'Enter' && (event.target.tagName !== 'BUTTON' || event.target.matches('.number-key, .action-keys button')) && event.target.tagName !== 'A') { event.preventDefault(); confirmVote(); }
   else if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Escape') { event.preventDefault(); correct(); }
   else if (event.key.toLowerCase() === 'b') { event.preventDefault(); voteBlank(); }
 });
@@ -165,7 +203,7 @@ function renderResults() {
   const total = state.votes[0] + state.votes[1] + state.blank;
   const winner = state.votes[0] === state.votes[1] ? null : state.votes[0] > state.votes[1] ? 0 : 1;
   $('result-title').textContent = total === 0 ? 'Nenhum voto registrado.' : winner === null ? 'Empate! Será necessária uma nova eleição.' : `${state.names[winner]} ${state.closed ? 'venceu' : 'está na frente'} com ${state.votes[winner]} voto(s).`;
-  $('results').innerHTML = [...state.names, 'Em branco'].map((name, index) => {
+  $('results').innerHTML = [...state.names.map((name, i) => `${CANDIDATE_NUMBERS[i]} · ${name}`), 'Em branco'].map((name, index) => {
     const count = index === 2 ? state.blank : state.votes[index];
     const percent = total ? (count / total * 100).toFixed(1) : '0.0';
     return `<div class="result-row"><div class="result-line"><span>${escapeHTML(name)}</span><strong>${count} · ${percent}%</strong></div><div class="bar"><span style="width:${percent}%"></span></div></div>`;
@@ -179,33 +217,8 @@ function renderResults() {
   $('end-election').textContent = state.closed ? 'Votação encerrada' : 'Encerrar votação';
   $('reset').disabled = storageBlocked;
 }
-$('admin').addEventListener('click', () => {
-  $('login-form').hidden = false;
-  $('admin-panel').hidden = true;
-  $('login-error').textContent = '';
-  $('admin-message').textContent = '';
-  $('password').value = '';
-  $('admin-dialog').showModal();
-  $('password').focus();
-});
 $('close-admin').addEventListener('click', () => $('admin-dialog').close());
-$('admin-dialog').addEventListener('close', () => {
-  $('password').value = '';
-  $('admin-panel').hidden = true;
-  $('login-form').hidden = false;
-});
-$('login-form').addEventListener('submit', event => {
-  event.preventDefault();
-  if ($('password').value !== ADMIN_CODE) {
-    $('login-error').textContent = 'Código incorreto. Tente novamente.';
-    $('password').select();
-    return;
-  }
-  $('password').value = '';
-  $('login-form').hidden = true;
-  $('admin-panel').hidden = false;
-  renderResults();
-});
+$('admin-dialog').addEventListener('close', () => { $('admin-panel').hidden = true; selection = ''; render(); });
 $('settings').addEventListener('submit', event => {
   event.preventDefault();
   if (state.votes[0] + state.votes[1] + state.blank > 0 || state.closed) return;

@@ -1,40 +1,54 @@
-# Urna escolar · 2A & 2B
+# Urna eletrônica · 2A & 2B
 
-Uma urna eletrônica para a eleição da turma, feita com **HTML, CSS e JavaScript**, inspirada no programa Python de contagem de votos. Interface responsiva com gabinete, tela, teclado com relevo, botões BRANCO/CORRIGE/CONFIRMA e sons sintetizados semelhantes aos de uma urna.
+Simulador escolar em HTML, CSS e JavaScript. A página inteira representa o gabinete da urna: tela à esquerda, identificação “Justiça Eleitoral”, teclado preto e teclas BRANCO, CORRIGE e CONFIRMA. O desenho é inspirado na referência fornecida, com um emblema vetorial estilizado e sem vínculo com a Justiça Eleitoral.
 
 ## Abrir
 
-Baixe este repositório e abra **index.html** no navegador. Não precisa instalar pacotes ou executar Python. Para servir em localhost, opcionalmente execute `python -m http.server 8000` nesta pasta e acesse http://localhost:8000. Use sempre a mesma forma de acesso durante a eleição: trocar a origem/endereço muda o armazenamento utilizado.
+Baixe o repositório e abra **index.html** no navegador. Não precisa instalar dependências. Opcionalmente, execute `python -m http.server 8000` na pasta e acesse http://localhost:8000. Durante uma eleição, use sempre o mesmo navegador, dispositivo e endereço, pois os votos ficam no armazenamento local dessa origem.
 
-## Votar
+## Votação
 
-- **1**: Fulano; **2**: Bertrano.
-- **3**, tecla **B** ou botão **BRANCO**: nenhum candidato.
-- **CORRIGE**, Backspace, Delete ou Escape: limpar a seleção.
-- **CONFIRMA**: registrar o voto; Enter também confirma quando o foco não está em outro botão.
-- Aguarde o som e a mensagem **FIM**. A urna fica pronta para a próxima pessoa automaticamente.
-- Números diferentes de 1, 2 e 3 são inválidos e não podem ser confirmados. Um segundo dígito não substitui a seleção: use CORRIGE.
+- **67**: primeiro candidato (Fulano por padrão).
+- **33**: segundo candidato (Bertrano por padrão).
+- Digite os **dois números**, confira o nome e pressione **CONFIRMA** ou Enter.
+- **BRANCO**, ou a tecla **B**, seleciona voto em branco. Confirme para registrá-lo.
+- **CORRIGE**, Backspace, Delete ou Escape limpa todo o preenchimento.
+- Outros números são inválidos e não podem ser confirmados. Um terceiro dígito não altera um candidato já preenchido; use CORRIGE.
+- Depois do som e da mensagem **FIM**, a urna fica pronta para a próxima pessoa.
 
-O áudio é gerado pela Web Audio API depois de uma interação. Use o controle “Som ligado” para silenciar ou reativar. Os sons são uma aproximação sintetizada, não uma gravação oficial.
+Os números podem ser clicados ou digitados no teclado do computador. Em celulares, o gabinete se adapta à largura e coloca o teclado abaixo da tela.
 
-## Mesário e apuração
+## Área dos mesários
 
-Clique em **Área do mesário** e informe o código do programa original: **12345678901**. Ele pode ser alterado na constante `ADMIN_CODE` em `app.js`.
+Na própria urna, com o preenchimento vazio, digite **012345678901**, incluindo o **zero inicial**. A área dos mesários abre automaticamente ao completar os 12 dígitos, sem precisar confirmar. O código também funciona depois de encerrar a eleição. Não existe mais um botão externo de acesso ao mesário.
 
-Antes do primeiro voto, personalize os nomes dos dois candidatos. Depois do início, os nomes ficam bloqueados para preservar a associação dos votos. A apuração exibe os votos por candidato, os brancos, o total e o vencedor ou empate. Os votos em branco entram no total de comparecimento, mas não definem o vencedor. Os percentuais usam todos os votos como denominador.
+O zero inicial inicia uma entrada separada, exibida como pontos. Essa sequência nunca é contada como voto. CORRIGE cancela o código. Um código incorreto com 12 dígitos é descartado e pode ser tentado novamente.
 
-**Encerrar votação** bloqueia novos votos. Em um empate, o mesário pode iniciar uma nova eleição. **Iniciar nova eleição** pede confirmação antes de zerar os votos e mantém os nomes dos candidatos. Ao contrário do exemplo Python, o empate não apaga a contagem automaticamente, permitindo conferir o resultado primeiro.
+No painel é possível:
 
-## Armazenamento e escopo
+- Alterar os nomes dos candidatos **67 e 33** antes do primeiro voto.
+- Conferir votos, brancos, total, percentuais, vencedor e empate.
+- Encerrar a votação, bloqueando novos votos.
+- Iniciar uma nova eleição, com confirmação antes de zerar os votos.
 
-Este é um simulador educativo local. Os totais ficam no `localStorage` deste navegador/dispositivo e sobrevivem à atualização da página. Não há servidor nem sincronização entre computadores. Use **uma única aba e um único dispositivo** por eleição. Se detectar alterações em outra aba, a aplicação bloqueia a votação nesta aba até recarregar. Não limpe os dados do navegador durante a eleição. Se o armazenamento falhar, o voto não é confirmado.
+Os brancos entram no total e nos percentuais, mas não determinam o vencedor. Empates não apagam a contagem automaticamente. Os nomes são preservados ao iniciar uma nova eleição.
 
-O código do mesário está no JavaScript e não é autenticação segura: alguém com acesso às ferramentas do navegador pode ler o código e alterar os dados locais. O simulador não identifica eleitores nem impede a mesma pessoa de votar novamente; a turma deve organizar a fila com o mesário. Não é destinado a eleições oficiais.
+O código está em `ADMIN_CODE` e os números em `CANDIDATE_NUMBERS`, no arquivo `app.js`. Os votos e nomes da versão anterior são preservados: o antigo candidato 1 corresponde ao **67**, e o antigo candidato 2 ao **33**.
 
-A fonte do Google Fonts é opcional; sem internet, fontes locais são utilizadas e a votação e os sons continuam funcionando. Não há imagens ou bibliotecas externas necessárias.
+## Sons
+
+Sons gerados localmente pela Web Audio API, com bipes de tecla e uma sequência rápida seguida de um tom prolongado na confirmação. O ganho foi aumentado em relação à primeira versão e o timbre filtrado para aproximar a sonoridade de uma urna, sem arquivos externos. É uma síntese inspirada no equipamento, não uma gravação oficial. O volume final depende do navegador, do sistema e dos alto-falantes. O botão “Som ligado” permite silenciar.
+
+## Armazenamento e limites
+
+Os votos ficam no `localStorage` e sobrevivem a recarregamentos. Use uma única aba por eleição. Se os dados mudarem em outra aba, esta urna bloqueia a votação até recarregar. Se não for possível salvar, o voto não é confirmado. Não limpe os dados do navegador durante a eleição.
+
+É um simulador educativo local, sem servidor, sincronização ou identificação dos eleitores. A organização da fila cabe ao mesário. O código no JavaScript é uma proteção de interface, não autenticação segura: alguém com ferramentas do navegador pode ler o código e modificar dados. Não é destinado a eleições oficiais.
+
+Nenhuma fonte, imagem, áudio ou biblioteca externa é necessária: a aplicação funciona offline.
 
 ## Arquivos
 
-- `index.html`: estrutura e painel do mesário.
-- `style.css`: aparência da urna e adaptação para celulares.
-- `app.js`: votos, som, armazenamento, atalhos e apuração.
+- `index.html`: gabinete, emblema vetorial e painel do mesário.
+- `style.css`: aparência física e adaptação de tamanho.
+- `app.js`: teclado, votação, sons, armazenamento e apuração.
