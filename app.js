@@ -4,7 +4,8 @@
 const ADMIN_CODE = '012345678901';
 const STORAGE_KEY = 'urna-2a-2b-v1';
 const $ = (id) => document.getElementById(id);
-const initialState = () => ({ names: ['Fulano', 'Bertrano'], numbers: ['67', '33'], votes: [0, 0], blank: 0, closed: false });
+const RAUL_PHOTO = 'assets/raul-67.jpg';
+const initialState = () => ({ names: ['Raul', 'Bertrano'], numbers: ['67', '33'], photos: [RAUL_PHOTO, null], votes: [0, 0], blank: 0, closed: false });
 let state = initialState();
 let storageBlocked = false;
 try {
@@ -14,7 +15,12 @@ try {
     if (!Array.isArray(parsed.names) || parsed.names.length !== 2 || !parsed.names.every(n => typeof n === 'string' && n.trim().length > 0 && n.length <= 35) || !Array.isArray(parsed.votes) || parsed.votes.length !== 2 || !parsed.votes.every(n => Number.isSafeInteger(n) && n >= 0) || !Number.isSafeInteger(parsed.blank) || parsed.blank < 0 || typeof parsed.closed !== 'boolean') throw new Error('Dados inválidos');
     const numbers = parsed.numbers === undefined ? ['67', '33'] : parsed.numbers;
     if (!Array.isArray(numbers) || numbers.length !== 2 || !numbers.every(n => typeof n === 'string' && /^[1-9][0-9]$/.test(n)) || numbers[0] === numbers[1]) throw new Error('Números inválidos');
-    state = { ...parsed, numbers };
+    const names = [...parsed.names];
+    const noVotes = parsed.votes[0] + parsed.votes[1] + parsed.blank === 0;
+    if (parsed.photos === undefined && noVotes && names[0] === 'Fulano' && numbers[0] === '67') names[0] = 'Raul';
+    const photos = parsed.photos === undefined ? [names[0] === 'Raul' && numbers[0] === '67' ? RAUL_PHOTO : null, null] : parsed.photos;
+    if (!Array.isArray(photos) || photos.length !== 2 || !photos.every(photo => photo === null || photo === RAUL_PHOTO || (typeof photo === 'string' && photo.length < 500000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo)))) throw new Error('Fotos inválidas');
+    state = { ...parsed, names, numbers, photos };
   }
 } catch {
   storageBlocked = true;
@@ -112,7 +118,8 @@ function render() {
   const invalid = !candidate && !blank && selection.length === 2;
   const name = candidate ? state.names[index] : blank ? 'VOTO EM BRANCO' : invalid ? 'NÚMERO INVÁLIDO' : 'Digite o segundo número';
   const digits = [0,1].map(i => `<span class="digit ${selection.length === i ? 'empty' : ''}">${escapeHTML(selection[i] || '')}</span>`).join('');
-  $('screen').innerHTML = `<div class="screen-top">SEU VOTO PARA</div><h2>Representante de turma</h2><div class="vote-content"><div class="candidate-data">${blank ? '' : `<div class="number-line"><span>Número:</span><div class="digits">${digits}</div></div>`}<p class="candidate-name">${escapeHTML(name)}</p><span class="candidate-party">${candidate ? 'ELEIÇÃO ESCOLAR · 2A & 2B' : invalid ? 'USE CORRIGE PARA TENTAR NOVAMENTE' : blank ? 'NENHUM CANDIDATO SELECIONADO' : 'AGUARDANDO PREENCHIMENTO'}</span></div>${candidate ? '<div class="portrait" aria-hidden="true"><svg viewBox="0 0 80 90"><circle cx="40" cy="28" r="18"/><path d="M8 85v-9c0-23 15-30 32-30s32 7 32 30v9z"/></svg></div>' : ''}</div><div class="screen-instructions">Aperte a tecla:<br><b>CONFIRMA</b> para CONFIRMAR este voto<br><b>CORRIGE</b> para REINICIAR este voto</div>`;
+  const portrait = candidate ? `<div class="portrait" aria-label="Foto de ${escapeHTML(name)}">${state.photos[index] ? `<img src="${escapeHTML(state.photos[index])}" alt="Foto de ${escapeHTML(name)}">` : '<svg viewBox="0 0 80 90" aria-hidden="true"><circle cx="40" cy="28" r="18"/><path d="M8 85v-9c0-23 15-30 32-30s32 7 32 30v9z"/></svg>'}</div>` : '';
+  $('screen').innerHTML = `<div class="screen-top">SEU VOTO PARA</div><h2>Representante de turma</h2><div class="vote-content"><div class="candidate-data">${blank ? '' : `<div class="number-line"><span>Número:</span><div class="digits">${digits}</div></div>`}<p class="candidate-name">${escapeHTML(name)}</p><span class="candidate-party">${candidate ? 'ELEIÇÃO ESCOLAR · 2A & 2B' : invalid ? 'USE CORRIGE PARA TENTAR NOVAMENTE' : blank ? 'NENHUM CANDIDATO SELECIONADO' : 'AGUARDANDO PREENCHIMENTO'}</span></div>${portrait}</div><div class="screen-instructions">Aperte a tecla:<br><b>CONFIRMA</b> para CONFIRMAR este voto<br><b>CORRIGE</b> para REINICIAR este voto</div>`;
   $('confirm').disabled = !(candidate || blank);
 }
 
@@ -215,6 +222,18 @@ function renderResults() {
   $('number1').value = state.numbers[0];
   $('number2').value = state.numbers[1];
   $('name1').disabled = $('name2').disabled = $('number1').disabled = $('number2').disabled = total > 0 || state.closed || storageBlocked;
+  for (let i = 0; i < 2; i++) {
+    const preview = $(`photo-preview-${i + 1}`);
+    preview.replaceChildren();
+    if (state.photos[i]) {
+      const image = document.createElement('img');
+      image.src = state.photos[i];
+      image.alt = `Foto de ${state.names[i]}`;
+      preview.append(image);
+    } else preview.textContent = 'Sem foto';
+    $(`photo${i + 1}`).disabled = $(`remove-photo-${i + 1}`).disabled = total > 0 || state.closed || storageBlocked;
+    $(`remove-photo-${i + 1}`).hidden = !state.photos[i];
+  }
   $('settings').querySelector('button').disabled = total > 0 || state.closed || storageBlocked;
   $('end-election').disabled = state.closed || storageBlocked;
   $('end-election').textContent = state.closed ? 'Votação encerrada' : 'Encerrar votação';
@@ -232,12 +251,70 @@ $('settings').addEventListener('submit', event => {
     $('admin-message').textContent = 'Use dois números diferentes, de 10 a 99. O zero inicial é reservado ao mesário.';
     return;
   }
-  if (persist({ ...state, names, numbers })) {
+  const photos = state.photos.map(photo => photo === RAUL_PHOTO && !(names[0] === 'Raul' && numbers[0] === '67') ? null : photo);
+  if (persist({ ...state, names, numbers, photos })) {
     $('admin-message').textContent = 'Nomes e números atualizados. A urna está pronta.';
     render();
     renderResults();
   }
 });
+async function compressPhoto(file) {
+  if (!file.type.startsWith('image/')) throw new Error('Escolha um arquivo de imagem.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('A imagem deve ter no máximo 10 MB.');
+  const objectURL = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = objectURL;
+    await image.decode();
+    const scale = Math.min(480 / image.naturalWidth, 640 / image.naturalHeight, 1);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(image.naturalWidth * scale);
+    canvas.height = Math.round(image.naturalHeight * scale);
+    if (!canvas.width || !canvas.height) throw new Error('Imagem inválida.');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Não foi possível processar a imagem.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const photo = canvas.toDataURL('image/jpeg', .78);
+    if (photo.length >= 500000) throw new Error('A foto ficou grande demais. Escolha outra imagem.');
+    return photo;
+  } finally { URL.revokeObjectURL(objectURL); }
+}
+for (let i = 0; i < 2; i++) {
+  $(`photo${i + 1}`).addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.disabled = true;
+    $('admin-message').textContent = 'Preparando foto...';
+    try {
+      const photo = await compressPhoto(file);
+      if (state.votes[0] + state.votes[1] + state.blank > 0 || state.closed || storageBlocked) return;
+      const photos = [...state.photos];
+      photos[i] = photo;
+      if (persist({ ...state, photos })) {
+        $('admin-message').textContent = 'Foto salva. Ela aparecerá ao digitar o número do candidato.';
+        renderResults();
+        render();
+      }
+    } catch (error) {
+      $('admin-message').textContent = error.message || 'Não foi possível abrir a imagem.';
+    } finally {
+      event.target.value = '';
+      event.target.disabled = state.votes[0] + state.votes[1] + state.blank > 0 || state.closed || storageBlocked;
+    }
+  });
+  $(`remove-photo-${i + 1}`).addEventListener('click', () => {
+    if (state.votes[0] + state.votes[1] + state.blank > 0 || state.closed || storageBlocked) return;
+    const photos = [...state.photos];
+    photos[i] = null;
+    if (persist({ ...state, photos })) {
+      $('admin-message').textContent = 'Foto removida.';
+      renderResults();
+      render();
+    }
+  });
+}
 $('end-election').addEventListener('click', () => {
   if (persist({ ...state, closed: true })) {
     clearTimeout(finishTimer);
@@ -250,7 +327,7 @@ $('end-election').addEventListener('click', () => {
 $('reset').addEventListener('click', () => $('reset-dialog').showModal());
 $('cancel-reset').addEventListener('click', () => $('reset-dialog').close());
 $('confirm-reset').addEventListener('click', () => {
-  if (!persist({ ...initialState(), names: [...state.names], numbers: [...state.numbers] })) return;
+  if (!persist({ ...initialState(), names: [...state.names], numbers: [...state.numbers], photos: [...state.photos] })) return;
   clearTimeout(finishTimer);
   busy = false;
   selection = '';

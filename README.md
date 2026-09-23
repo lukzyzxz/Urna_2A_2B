@@ -8,7 +8,7 @@ Baixe o repositório e abra **index.html** no navegador. Não precisa instalar d
 
 ## Votação
 
-- **67**: primeiro candidato (Fulano por padrão).
+- **67**: primeiro candidato (Raul por padrão, com foto inicial).
 - **33**: segundo candidato (Bertrano por padrão). O mesário pode alterar ambos os números antes do primeiro voto.
 - Digite os **dois números**, confira o nome e pressione **CONFIRMA** ou Enter.
 - **BRANCO**, ou a tecla **B**, seleciona voto em branco. Confirme para registrá-lo.
@@ -27,13 +27,14 @@ O zero inicial inicia uma entrada separada, exibida como pontos. Essa sequência
 No painel é possível:
 
 - Alterar o nome e o número de cada candidato antes do primeiro voto. Os números devem ter dois dígitos, entre **10 e 99**, e ser diferentes. Depois de iniciado o pleito, ficam bloqueados para preservar a associação dos votos.
+- Enviar ou remover a foto de cada candidato antes do primeiro voto. A imagem aparece na urna depois de digitar o número completo. A foto inicial do Raul está em `assets/raul-67.jpg`; ao mudar o nome ou o número dele, a foto inicial é removida para evitar associá-la a outra pessoa.
 - Conferir votos, brancos, total, percentuais, vencedor e empate.
 - Encerrar a votação, bloqueando novos votos.
 - Iniciar uma nova eleição, com confirmação antes de zerar os votos.
 
 Os brancos entram no total e nos percentuais, mas não determinam o vencedor. Empates não apagam a contagem automaticamente. Os nomes são preservados ao iniciar uma nova eleição.
 
-O código está em `ADMIN_CODE`, no arquivo `app.js`. Os números dos candidatos são salvos junto com os votos neste navegador. Os dados anteriores são preservados: o antigo candidato 1 começa com **67**, e o antigo candidato 2 com **33**. Ao iniciar uma nova eleição, os nomes e números configurados continuam disponíveis.
+O código está em `ADMIN_CODE`, no arquivo `app.js`. Números e fotos enviados são salvos junto com os votos neste navegador. Fotos de até 10 MB são reduzidas no próprio dispositivo e convertidas para JPEG antes de salvar; se o navegador não tiver espaço, o envio é recusado sem alterar a foto anterior. Os dados anteriores são preservados: o antigo candidato 1 começa com **67**, e o antigo candidato 2 com **33**. Ao iniciar uma nova eleição, nomes, números e fotos configurados continuam disponíveis.
 
 ## Sons
 
@@ -52,3 +53,4 @@ Nenhuma fonte, imagem, áudio ou biblioteca externa é necessária: a aplicaçã
 - `index.html`: gabinete, emblema vetorial e painel do mesário.
 - `style.css`: aparência física e adaptação de tamanho.
 - `app.js`: teclado, votação, sons, armazenamento e apuração.
+- `assets/raul-67.jpg`: retrato inicial do Raul para a tela da urna.
